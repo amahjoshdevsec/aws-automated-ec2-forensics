@@ -1,6 +1,6 @@
 # Checkov configuration for CI. Findings fail the build.
-# Intentional exceptions are documented inline next to the resource with
-# "# checkov:skip=<ID>:<reason>" so the justification lives with the code.
+# Organisation-wide design decisions are skipped here with the reason;
+# resource-specific exceptions are justified inline with "# checkov:skip=<ID>:<reason>".
 directory:
   - terraform
 framework:
@@ -8,3 +8,26 @@ framework:
 compact: true
 quiet: true
 soft-fail: false
+skip-check:
+  # Lambdas call only AWS APIs; running them in a VPC adds NAT/endpoint cost without reducing risk here.
+  - CKV_AWS_117
+  # Orchestration Lambdas are invoked synchronously by Step Functions, which owns retries and catches (no async DLQ).
+  - CKV_AWS_116
+  # Reserved concurrency breaks deployment on new accounts (account limit of 10); Step Functions bounds concurrency.
+  - CKV_AWS_115
+  # Lambda code signing is a documented production step (README, "Delivery and operations").
+  - CKV_AWS_272
+  # Evidence bucket access logging and cross-region replication are production add-ons (README, "Evidence governance").
+  - CKV_AWS_18
+  - CKV_AWS_144
+  # Event notifications on the evidence bucket are not needed; the workflow notifies through SNS.
+  - CKV2_AWS_62
+  # Lab workstation has a public IP for egress only (no inbound rules); private subnet + endpoints is the documented production mode.
+  - CKV_AWS_88
+  # Approval routes use single-use 256-bit links behind a confirmation page; Cognito / IAM auth is the documented production option.
+  - CKV_AWS_309
+  # Wildcard resources are limited to EC2 Describe/isolation APIs that cannot be scoped before the resource exists,
+  # and to KMS key policies, where "*" means "this key".
+  - CKV_AWS_111
+  - CKV_AWS_356
+  - CKV_AWS_109

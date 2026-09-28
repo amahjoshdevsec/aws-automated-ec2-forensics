@@ -63,9 +63,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "evidence" {
       days          = var.evidence_retention_days
       storage_class = "DEEP_ARCHIVE"
     }
-    abort_incomplete_multipart_upload {
-      days_after_initiation = 7
-    }
   }
 
   rule {
@@ -77,6 +74,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "evidence" {
     noncurrent_version_expiration {
       noncurrent_days = 30
     }
+  }
+
+  rule {
+    id     = "abort-incomplete-uploads"
+    status = "Enabled"
+    filter {}
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
     }

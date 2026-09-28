@@ -188,7 +188,7 @@ for pair in "${PAIRS[@]}"; do
     case "$FSTYPE" in swap|LVM2_member|linux_raid_member) continue ;; esac
     FS_COUNT=$((FS_COUNT + 1))
     log " filesystem ${NAME} (${FSTYPE})"
-    analyse_filesystem "$NAME" "$FSTYPE" "${VDIR}/$(basename "$NAME")" "${MNT_ROOT}/${AVOL}/$(basename "$NAME")"
+    analyse_filesystem "$NAME" "$FSTYPE" "${VDIR}/$(basename "$NAME")" "${MNT_ROOT}/${AVOL}/$(basename "$NAME")" </dev/null
   done < <(lsblk -lnpo NAME,TYPE,FSTYPE "$DEV")
 
   printf '{"source_volume_id":"%s","analysis_volume_id":"%s","device":"%s","sha256":"%s","filesystems":%d}\n' \

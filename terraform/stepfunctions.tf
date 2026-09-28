@@ -55,6 +55,7 @@ resource "aws_cloudwatch_log_group" "sfn" {
 }
 
 resource "aws_sfn_state_machine" "forensics" {
+  # checkov:skip=CKV_AWS_285:Execution data is deliberately not written to logs (it contains approval task tokens and case details); full history is kept by Step Functions, DynamoDB and S3.
   name     = "${local.name}-workflow"
   role_arn = aws_iam_role.sfn.arn
   type     = "STANDARD"
