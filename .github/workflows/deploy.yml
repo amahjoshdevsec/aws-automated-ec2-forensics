@@ -1,0 +1,93 @@
+name: Deploy to AWS lab account
+
+# Manual workflow. One-time setup (see README "Option B"):
+#   1. Deploy bootstrap/github-oidc.yaml in your AWS account.
+#   2. Repository variables: AWS_DEPLOY_ROLE_ARN, TF_STATE_BUCKET, APPROVER_EMAIL, AWS_REGION (optional).
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to run"
+        type: choice
+        options: [plan, apply, smoke-test, apply-and-smoke-test, destroy]
+        default: plan
+
+permissions:
+  id-token: write # GitHub OIDC -> AWS STS, no stored keys
+  contents: read
+
+concurrency:
+  group: aws-lab-deploy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  TF_IN_AUTOMATION: "true"
+  TF_VAR_approver_email: ${{ vars.APPROVER_EMAIL }}
+  TF_VAR_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: aws-lab
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check repository variables
+        run: |
+          missing=0
+          for v in AWS_DEPLOY_ROLE_ARN TF_STATE_BUCKET APPROVER_EMAIL; do
+            if [ -z "${!v}" ]; then echo "::error::Repository variable $v is not set (Settings > Secrets and variables > Actions > Variables)"; missing=1; fi
+          done
+          exit $missing
+        env:
+          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          APPROVER_EMAIL: ${{ vars.APPROVER_EMAIL }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: gh-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 7200
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - name: Configure remote state
+        run: |
+          cat > backend_override.tf <<'EOF'
+          terraform {
+            backend "s3" {}
+          }
+          EOF
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=aws-automated-ec2-forensics/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true"
+
+      - name: terraform plan
+        if: inputs.action == 'plan'
+        run: terraform plan -input=false
+
+      - name: terraform apply
+        if: inputs.action == 'apply' || inputs.action == 'apply-and-smoke-test'
+        run: terraform apply -input=false -auto-approve
+
+      - name: End-to-end smoke test
+        if: inputs.action == 'smoke-test' || inputs.action == 'apply-and-smoke-test'
+        run: bash ../scripts/smoke-test.sh
+
+      - name: terraform destroy
+        if: inputs.action == 'destroy'
+        run: |
+          bash ../scripts/pre-destroy.sh --delete-evidence
+          terraform destroy -input=false -auto-approve

@@ -1,0 +1,374 @@
+{
+  "Comment": "Automated EC2 forensics: validate -> human approval -> snapshot -> re-encrypt -> (share) -> analyse -> custody -> (isolate)",
+  "TimeoutSeconds": ${execution_timeout},
+  "StartAt": "ValidateRequest",
+  "States": {
+    "ValidateRequest": {
+      "Type": "Task",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${validate}",
+        "Payload": {
+          "input.$": "$",
+          "execution_name.$": "$$.Execution.Name"
+        }
+      },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "NotifyFailure" }
+      ],
+      "Next": "RequestApproval"
+    },
+
+    "RequestApproval": {
+      "Type": "Task",
+      "Comment": "Callback pattern: the workflow pauses until an approver clicks approve/reject",
+      "Resource": "arn:${partition}:states:::lambda:invoke.waitForTaskToken",
+      "Parameters": {
+        "FunctionName": "${request_approval}",
+        "Payload": {
+          "state.$": "$",
+          "task_token.$": "$$.Task.Token"
+        }
+      },
+      "TimeoutSeconds": ${approval_timeout},
+      "ResultPath": "$.approval",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "NotifyFailure" }
+      ],
+      "Next": "ApprovalDecision"
+    },
+
+    "ApprovalDecision": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.approval.approved", "BooleanEquals": true, "Next": "CreateSnapshots" }
+      ],
+      "Default": "NotifyRejected"
+    },
+
+    "NotifyRejected": {
+      "Type": "Task",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": { "FunctionName": "${notify_rejected}", "Payload.$": "$" },
+      "OutputPath": "$.Payload",
+      "Next": "InvestigationRejected"
+    },
+
+    "InvestigationRejected": { "Type": "Succeed" },
+
+    "CreateSnapshots": {
+      "Type": "Task",
+      "Comment": "Enable termination protection, then snapshot every attached EBS volume",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": { "FunctionName": "${create_snapshots}", "Payload.$": "$" },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "CleanupOnFailure" }
+      ],
+      "Next": "WaitForSnapshots"
+    },
+
+    "WaitForSnapshots": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "CheckSnapshots"
+    },
+
+    "CheckSnapshots": {
+      "Type": "Task",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": { "FunctionName": "${check_snapshots}", "Payload.$": "$" },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "CleanupOnFailure" }
+      ],
+      "Next": "SnapshotRouter"
+    },
+
+    "SnapshotRouter": {
+      "Type": "Choice",
+      "Comment": "Loop until the current snapshot phase is complete, then move to the next phase",
+      "Choices": [
+        { "Variable": "$.snapshots_ready", "BooleanEquals": false, "Next": "WaitForSnapshots" },
+        { "Variable": "$.snapshot_phase", "StringEquals": "source", "Next": "ReEncryptWithForensicsKey" },
+        {
+          "And": [
+            { "Variable": "$.snapshot_phase", "StringEquals": "encrypted" },
+            { "Variable": "$.cross_account", "BooleanEquals": true }
+          ],
+          "Next": "ShareToForensicsAccount"
+        }
+      ],
+      "Default": "AttachToWorkstation"
+    },
+
+    "ReEncryptWithForensicsKey": {
+      "Type": "Task",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": { "FunctionName": "${copy_snapshots}", "Payload.$": "$" },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "CleanupOnFailure" }
+      ],
+      "Next": "WaitForSnapshots"
+    },
+
+    "ShareToForensicsAccount": {
+      "Type": "Task",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": { "FunctionName": "${share_snapshots}", "Payload.$": "$" },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "CleanupOnFailure" }
+      ],
+      "Next": "WaitForSnapshots"
+    },
+
+    "AttachToWorkstation": {
+      "Type": "Task",
+      "Comment": "Create disposable CMK-encrypted volumes from the evidence snapshots and attach them",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": { "FunctionName": "${attach_volumes}", "Payload.$": "$" },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": ["WorkstationNotReady"],
+          "IntervalSeconds": 60,
+          "MaxAttempts": 10,
+          "BackoffRate": 1
+        },
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "CleanupOnFailure" }
+      ],
+      "Next": "StartForensicScan"
+    },
+
+    "StartForensicScan": {
+      "Type": "Task",
+      "Comment": "SSM Run Command: hash, timeline, ClamAV, YARA, artifact collection",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": { "FunctionName": "${start_scan}", "Payload.$": "$" },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": ["WorkstationNotReady"],
+          "IntervalSeconds": 60,
+          "MaxAttempts": 15,
+          "BackoffRate": 1
+        },
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "CleanupOnFailure" }
+      ],
+      "Next": "WaitForScan"
+    },
+
+    "WaitForScan": {
+      "Type": "Wait",
+      "Seconds": 60,
+      "Next": "CheckScan"
+    },
+
+    "CheckScan": {
+      "Type": "Task",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": { "FunctionName": "${check_scan}", "Payload.$": "$" },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "CleanupOnFailure" }
+      ],
+      "Next": "ScanRouter"
+    },
+
+    "ScanRouter": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.scan.status", "StringEquals": "Success", "Next": "Cleanup" }
+      ],
+      "Default": "WaitForScan"
+    },
+
+    "Cleanup": {
+      "Type": "Task",
+      "Comment": "Detach and delete analysis volumes, delete intermediate snapshots (evidence snapshot is kept)",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": { "FunctionName": "${cleanup}", "Payload.$": "$" },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "NotifyFailure" }
+      ],
+      "Next": "FinalizeCase"
+    },
+
+    "FinalizeCase": {
+      "Type": "Task",
+      "Comment": "Chain-of-custody manifest, evidence hash tags, report notification",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": { "FunctionName": "${finalize}", "Payload.$": "$" },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "NotifyFailure" }
+      ],
+      "Next": "IsolationDecision"
+    },
+
+    "IsolationDecision": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.isolate", "BooleanEquals": true, "Next": "IsolateInstance" }
+      ],
+      "Default": "InvestigationComplete"
+    },
+
+    "IsolateInstance": {
+      "Type": "Task",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": { "FunctionName": "${isolate}", "Payload.$": "$" },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "NotifyFailure" }
+      ],
+      "Next": "InvestigationComplete"
+    },
+
+    "InvestigationComplete": { "Type": "Succeed" },
+
+    "CleanupOnFailure": {
+      "Type": "Task",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": { "FunctionName": "${cleanup}", "Payload.$": "$" },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.cleanup_error", "Next": "NotifyFailure" }
+      ],
+      "Next": "NotifyFailure"
+    },
+
+    "NotifyFailure": {
+      "Type": "Task",
+      "Resource": "arn:${partition}:states:::lambda:invoke",
+      "Parameters": { "FunctionName": "${notify_failure}", "Payload.$": "$" },
+      "ResultPath": null,
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": null, "Next": "InvestigationFailed" }
+      ],
+      "Next": "InvestigationFailed"
+    },
+
+    "InvestigationFailed": {
+      "Type": "Fail",
+      "Error": "InvestigationFailed",
+      "Cause": "See the NotifyFailure input and the failure email for details"
+    }
+  }
+}

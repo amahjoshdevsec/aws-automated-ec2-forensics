@@ -1,0 +1,12 @@
+# Remote state for team / production use. Rename to backend.tf and run
+# `terraform init -migrate-state`. Create the bucket (versioned, encrypted,
+# public access blocked) in your security tooling / forensics account first.
+terraform {
+  backend "s3" {
+    bucket       = "my-org-terraform-state-111111111111"
+    key          = "security/ec2-forensics/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true # S3 native locking (Terraform >= 1.10). Use dynamodb_table on older versions.
+  }
+}

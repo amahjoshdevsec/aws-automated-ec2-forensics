@@ -1,0 +1,30 @@
+# Copy to terraform.tfvars and edit. terraform.tfvars is git-ignored.
+
+region         = "us-east-1"
+project_name   = "ec2-forensics"
+approver_email = "you@example.com"
+# notification_email = "soc-team@example.com"   # defaults to approver_email
+
+# Demo target with planted (inert) indicators of compromise
+deploy_test_target = true
+
+# Workstation sizing
+workstation_instance_type  = "t3.medium"
+workstation_root_volume_gb = 40
+
+# Lab-friendly settings. For production set force_destroy_evidence_bucket = false
+# and enable_object_lock = true (see README "Enterprise / production").
+force_destroy_evidence_bucket = true
+enable_object_lock            = false
+log_retention_days            = 30
+
+# Automatically open a case for high severity GuardDuty EC2 findings (GuardDuty must be enabled)
+enable_guardduty_trigger = false
+guardduty_min_severity   = 7
+
+# Multi-account: workload accounts that have terraform/modules/member-account-role deployed
+member_account_ids = []
+
+tags = {
+  Owner = "security-team"
+}
