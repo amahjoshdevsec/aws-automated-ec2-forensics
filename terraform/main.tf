@@ -2,6 +2,7 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 
 data "aws_availability_zones" "available" {
+  # checkov:skip=CKV_AWS_394:Only the first AZ is used, and only at creation time; the lab has no multi-AZ placement to keep stable.
   state = "available"
 }
 

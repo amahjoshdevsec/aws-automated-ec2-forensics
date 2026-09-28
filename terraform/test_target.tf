@@ -9,6 +9,7 @@ data "aws_ssm_parameter" "al2023" {
 }
 
 resource "aws_security_group" "test_target" {
+  # checkov:skip=CKV2_AWS_5:Attached to the demo target instance (count-based reference not resolved by the check).
   count       = var.deploy_test_target ? 1 : 0
   name        = "${local.name}-demo-target"
   description = "Demo target - no inbound, no outbound"
@@ -17,6 +18,7 @@ resource "aws_security_group" "test_target" {
 }
 
 resource "aws_instance" "test_target" {
+  # checkov:skip=CKV2_AWS_41:The demo "compromised" instance deliberately has no IAM role and no network path.
   count                  = var.deploy_test_target ? 1 : 0
   ami                    = data.aws_ssm_parameter.al2023[0].value
   instance_type          = "t3.micro"
@@ -49,6 +51,7 @@ resource "aws_instance" "test_target" {
 }
 
 resource "aws_ebs_volume" "test_target_data" {
+  # checkov:skip=CKV_AWS_189:Demo workload intentionally uses the default aws/ebs key, like most real workloads; the pipeline re-encrypts evidence with the forensics CMK.
   count             = var.deploy_test_target ? 1 : 0
   availability_zone = local.az
   size              = 1

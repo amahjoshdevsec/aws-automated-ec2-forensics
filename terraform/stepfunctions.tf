@@ -82,7 +82,7 @@ resource "aws_sfn_state_machine" "forensics" {
   logging_configuration {
     log_destination        = "${aws_cloudwatch_log_group.sfn.arn}:*"
     include_execution_data = false
-    level                  = "ERROR"
+    level                  = "ALL"
   }
 
   tracing_configuration {

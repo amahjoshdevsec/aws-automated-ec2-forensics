@@ -340,7 +340,7 @@ The lab is intentionally the smallest thing that demonstrates the full pattern. 
 ### Delivery and operations
 
 1. **Remote state** in S3 with native locking (`backend.tf.example`), plans reviewed in pull requests, applies from a pipeline role with a permissions boundary (the bootstrap template's `DeployPolicyArn` parameter).
-2. **Policy as code**: keep Checkov strict (`soft-fail: false`) and add OPA/Conftest or Sentinel for organisation rules; enable Lambda code signing.
+2. **Policy as code**: Checkov already blocks the build; add OPA/Conftest or Sentinel for organisation rules; enable Lambda code signing.
 3. **Game days**: run `scripts/smoke-test.sh` on a schedule in a sandbox account so the pipeline is proven to work before an incident needs it.
 4. **Runbooks and SLOs**: track time from alert to report (the OneMain metric), approval wait time and failure rate using the CloudWatch metrics and the cases table.
 
@@ -366,7 +366,7 @@ Save money between tests: stop the workstation (`aws ec2 stop-instances --instan
 | Lambda unit tests (26) | `python -m pytest tests/` with mocked AWS clients: validation, injection rejection, approval single use and expiry, snapshot phases, device allocation, cleanup never deleting evidence, isolation | No |
 | State machine | Test asserts the ASL renders to valid JSON and every transition target exists and every state is reachable | No |
 | Terraform | `terraform fmt`, `validate`, and `terraform test` against a mocked AWS provider (defaults, production settings, input validation) | No |
-| Static analysis | Checkov (documented skips in `.checkov.yaml`), ShellCheck | No |
+| Static analysis | Checkov (blocking; the few intentional exceptions are justified inline with `checkov:skip`), ShellCheck | No |
 | End to end | `scripts/smoke-test.sh` or the Deploy workflow's `smoke-test` action | Yes |
 
 ```bash
