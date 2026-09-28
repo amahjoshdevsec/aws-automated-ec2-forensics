@@ -47,7 +47,7 @@ resource "aws_apigatewayv2_stage" "approval" {
 
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api.arn
-    format          = jsonencode({
+    format = jsonencode({
       requestId = "$context.requestId"
       ip        = "$context.identity.sourceIp"
       userAgent = "$context.identity.userAgent"

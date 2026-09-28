@@ -47,7 +47,7 @@ history -c
 EOF
 
 # 6. Second EBS volume (data disk) with a planted PHP webshell, to show multi-volume handling
-for i in $(seq 1 60); do
+for _ in $(seq 1 60); do
   DATA_DEV=$(lsblk -dnpo NAME,SERIAL | awk '$2 ~ /^vol/ {print $1}' | grep -v "$(findmnt -no SOURCE / | sed 's/p[0-9]*$//')" | head -1 || true)
   [ -n "$DATA_DEV" ] && break
   sleep 5

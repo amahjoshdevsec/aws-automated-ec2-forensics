@@ -40,7 +40,7 @@ output "test_target_instance_id" {
 
 output "start_investigation_command" {
   description = "Copy/paste command to start an investigation of the demo target."
-  value       = var.deploy_test_target ? join(" ", [
+  value = var.deploy_test_target ? join(" ", [
     "aws stepfunctions start-execution --region ${local.region}",
     "--state-machine-arn ${aws_sfn_state_machine.forensics.arn}",
     "--input '{\"instance_id\":\"${aws_instance.test_target[0].id}\",\"requested_by\":\"soc-analyst\",\"reason\":\"demo investigation\",\"isolate\":false}'",

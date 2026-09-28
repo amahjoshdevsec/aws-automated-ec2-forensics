@@ -183,7 +183,7 @@ for pair in "${PAIRS[@]}"; do
   lsblk -o NAME,SIZE,TYPE,FSTYPE,LABEL,UUID,PARTLABEL "$DEV" > "${VDIR}/partitions.txt" || true
 
   FS_COUNT=0
-  while read -r NAME TYPE FSTYPE; do
+  while read -r NAME _TYPE FSTYPE; do
     [[ -n "${FSTYPE:-}" ]] || continue
     case "$FSTYPE" in swap|LVM2_member|linux_raid_member) continue ;; esac
     FS_COUNT=$((FS_COUNT + 1))

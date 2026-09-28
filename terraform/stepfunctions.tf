@@ -20,15 +20,15 @@ resource "aws_iam_role" "sfn" {
 
 data "aws_iam_policy_document" "sfn" {
   statement {
-    sid       = "InvokeWorkflowSteps"
-    actions   = ["lambda:InvokeFunction"]
+    sid     = "InvokeWorkflowSteps"
+    actions = ["lambda:InvokeFunction"]
     resources = concat(
       [for f in aws_lambda_function.orchestrator : f.arn],
       [for f in aws_lambda_function.orchestrator : "${f.arn}:*"],
     )
   }
   statement {
-    sid     = "ExecutionLogging"
+    sid = "ExecutionLogging"
     actions = [
       "logs:CreateLogDelivery", "logs:GetLogDelivery", "logs:UpdateLogDelivery", "logs:DeleteLogDelivery",
       "logs:ListLogDeliveries", "logs:PutResourcePolicy", "logs:DescribeResourcePolicies", "logs:DescribeLogGroups",

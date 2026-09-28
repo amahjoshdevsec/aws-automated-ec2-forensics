@@ -16,7 +16,7 @@ resource "aws_iam_role" "orchestrator" {
 
 data "aws_iam_policy_document" "orchestrator" {
   statement {
-    sid     = "Logs"
+    sid = "Logs"
     actions = [
       "logs:CreateLogStream", "logs:PutLogEvents",
     ]
@@ -30,7 +30,7 @@ data "aws_iam_policy_document" "orchestrator" {
   }
 
   statement {
-    sid     = "DescribeEc2"
+    sid = "DescribeEc2"
     actions = [
       "ec2:DescribeInstances", "ec2:DescribeVolumes", "ec2:DescribeSnapshots",
       "ec2:DescribeSecurityGroups", "ec2:DescribeNetworkInterfaces",
@@ -108,7 +108,7 @@ data "aws_iam_policy_document" "orchestrator" {
   }
 
   statement {
-    sid     = "PreserveAndIsolateInstance"
+    sid = "PreserveAndIsolateInstance"
     actions = [
       "ec2:ModifyInstanceAttribute", "ec2:ModifyNetworkInterfaceAttribute",
       "ec2:CreateSecurityGroup", "ec2:RevokeSecurityGroupEgress",
@@ -117,8 +117,8 @@ data "aws_iam_policy_document" "orchestrator" {
   }
 
   statement {
-    sid       = "RunScan"
-    actions   = ["ssm:SendCommand"]
+    sid     = "RunScan"
+    actions = ["ssm:SendCommand"]
     resources = [
       aws_instance.workstation.arn,
       "arn:${local.partition}:ssm:${local.region}::document/AWS-RunShellScript",
@@ -144,7 +144,7 @@ data "aws_iam_policy_document" "orchestrator" {
   }
 
   statement {
-    sid     = "EvidenceKey"
+    sid = "EvidenceKey"
     actions = [
       "kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey",
     ]

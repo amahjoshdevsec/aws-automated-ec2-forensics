@@ -56,7 +56,7 @@ resource "aws_iam_role" "responder" {
 
 data "aws_iam_policy_document" "responder" {
   statement {
-    sid     = "Describe"
+    sid = "Describe"
     actions = [
       "ec2:DescribeInstances", "ec2:DescribeVolumes", "ec2:DescribeSnapshots",
       "ec2:DescribeSecurityGroups", "ec2:DescribeNetworkInterfaces",
@@ -89,7 +89,7 @@ data "aws_iam_policy_document" "responder" {
     }
   }
   statement {
-    sid     = "PreserveAndContain"
+    sid = "PreserveAndContain"
     actions = [
       "ec2:ModifyInstanceAttribute", "ec2:ModifyNetworkInterfaceAttribute",
       "ec2:CreateSecurityGroup", "ec2:RevokeSecurityGroupEgress",

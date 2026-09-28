@@ -3,13 +3,13 @@
 # The human approval gate still applies before any evidence is collected.
 
 resource "aws_cloudwatch_event_rule" "guardduty" {
-  count         = var.enable_guardduty_trigger ? 1 : 0
-  name          = "${local.name}-guardduty-ec2"
-  description   = "Start an EC2 forensic investigation for high severity GuardDuty findings"
+  count       = var.enable_guardduty_trigger ? 1 : 0
+  name        = "${local.name}-guardduty-ec2"
+  description = "Start an EC2 forensic investigation for high severity GuardDuty findings"
   event_pattern = jsonencode({
     source        = ["aws.guardduty"]
     "detail-type" = ["GuardDuty Finding"]
-    detail        = {
+    detail = {
       resource = { resourceType = ["Instance"] }
       severity = [{ numeric = [">=", var.guardduty_min_severity] }]
     }
@@ -33,11 +33,11 @@ resource "aws_iam_role" "events" {
 }
 
 resource "aws_iam_role_policy" "events" {
-  count  = var.enable_guardduty_trigger ? 1 : 0
-  name   = "start-forensics"
-  role   = aws_iam_role.events[0].id
+  count = var.enable_guardduty_trigger ? 1 : 0
+  name  = "start-forensics"
+  role  = aws_iam_role.events[0].id
   policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
       Action   = "states:StartExecution"

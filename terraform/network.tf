@@ -126,11 +126,11 @@ resource "aws_iam_role" "flow_logs" {
 }
 
 resource "aws_iam_role_policy" "flow_logs" {
-  count  = var.enable_flow_logs ? 1 : 0
-  name   = "write-flow-logs"
-  role   = aws_iam_role.flow_logs[0].id
+  count = var.enable_flow_logs ? 1 : 0
+  name  = "write-flow-logs"
+  role  = aws_iam_role.flow_logs[0].id
   policy = jsonencode({
-    Version   = "2012-10-17"
+    Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
       Action   = ["logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"]

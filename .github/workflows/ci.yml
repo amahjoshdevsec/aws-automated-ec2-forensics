@@ -33,6 +33,8 @@ jobs:
         with:
           terraform_version: "1.9.8"
       - name: terraform fmt
+        id: fmt
+        continue-on-error: true
         run: terraform fmt -check -recursive -diff
       - run: terraform init -backend=false -input=false
       - run: terraform validate
@@ -41,6 +43,9 @@ jobs:
       - name: validate member-account module
         working-directory: terraform/modules/member-account-role
         run: terraform init -backend=false -input=false && terraform validate
+      - name: Fail if formatting is off
+        if: steps.fmt.outcome == 'failure'
+        run: echo "::error::Run terraform fmt -recursive" && exit 1
 
   shellcheck:
     name: ShellCheck

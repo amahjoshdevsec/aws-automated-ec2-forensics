@@ -15,7 +15,7 @@ data "aws_iam_policy_document" "kms" {
   }
 
   statement {
-    sid     = "CloudWatchLogs"
+    sid = "CloudWatchLogs"
     actions = [
       "kms:Encrypt*", "kms:Decrypt*", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:Describe*",
     ]
@@ -44,7 +44,7 @@ data "aws_iam_policy_document" "kms" {
   dynamic "statement" {
     for_each = local.cross_account ? [1] : []
     content {
-      sid     = "MemberAccountResponderUse"
+      sid = "MemberAccountResponderUse"
       actions = [
         "kms:Encrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:DescribeKey", "kms:Decrypt",
       ]
