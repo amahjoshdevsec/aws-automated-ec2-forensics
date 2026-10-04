@@ -7,7 +7,6 @@
 
 A self-service, approval-gated digital forensics pipeline for Amazon EC2. An analyst (or a GuardDuty finding) names a suspect instance; a human approves; the workflow preserves every EBS volume as encrypted evidence, analyses a disposable copy on an isolated forensic workstation, writes a hashed chain-of-custody record and, optionally, quarantines the instance. No SSH, no console hopping into workload accounts, no developers pulled off their work.
 
-This project is an open, reproducible implementation of the pattern described in the AWS case study [*Speeding Up Security Forensics by 97.5% Using AWS Step Functions with OneMain Financial*](https://aws.amazon.com/solutions/case-studies/onemain-financial-aws-sfn-case-study/). It is not affiliated with OneMain Financial or AWS; it rebuilds the publicly described architecture so anyone can deploy and study it.
 
 ![Solution architecture](docs/images/architecture-overview.png)
 
